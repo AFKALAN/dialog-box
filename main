@@ -1,0 +1,189 @@
+import pygame
+import math
+
+pygame.init()
+
+WIN = pygame.display.set_mode((600, 400))
+CLOCK = pygame.time.Clock()
+SQUARE_SIZE = 75
+SPEED = 0.5
+COLOR_LIST = ['red', 'blue', 'purple', 'black', 'white', 'green']
+TEXT_FONT = pygame.font.SysFont('calibri', 16, True)
+TEXT_FONT.align = pygame.FONT_CENTER
+
+show_dialog = False
+dialog_start = False
+dialog_finish = False
+
+big_box = pygame.Surface((WIN.width, WIN.height / 2))
+big_box = pygame.transform.scale(big_box, (WIN.width - 190, WIN.height - 390))
+big_box.fill('white')
+
+offset_x = WIN.width / 2 - big_box.width / 2
+offset_y = (WIN.height / 2) / 2 - big_box.height / 2 
+padding = 50
+
+slide_whistle_open = pygame.mixer.Sound('slide_whistle_x.wav')
+slide_whistle_open.set_volume(0.01)
+slide_whistle_close = pygame.mixer.Sound('slide_whistle_down.wav')
+slide_whistle_close.set_volume(0.01)
+typewriter_click = pygame.mixer.Sound('typewriter_click.wav')
+typewriter_click.set_volume(0.01)
+
+shown_text = ''
+message = "Put a bunch of things together and got a working dialog system working! Next is probably menus? We'll see B)"
+render_start = False
+typing = False
+
+frame = 0
+
+def render_text(text, color, surface):
+    global shown_text
+    global typing
+    global dialog_finish
+
+    if text.__len__() != shown_text.__len__():
+        typing = True
+        if text[shown_text.__len__()] != " ":
+            typewriter_click.play()
+        else:
+            typewriter_click.stop()
+        shown_text += text[shown_text.__len__()]
+    else: 
+        typewriter_click.stop()
+        typing = False
+    
+    text_dimensions = TEXT_FONT.size(message)
+    dialog_box_width = surface.width - padding
+    dialog_box_height = math.ceil(text_dimensions[0] / dialog_box_width) * text_dimensions[1]
+    dialog_box_surface = pygame.Surface((dialog_box_width, dialog_box_height))
+
+    dialog_box_surface.fill('white')
+    text_render = TEXT_FONT.render(shown_text, False, color, wraplength=surface.width - padding)
+
+    dialog_box_surface.blit(text_render, (0, 0))
+    surface.blit(dialog_box_surface, ((surface.width - dialog_box_width) / 2, (surface.height - dialog_box_surface.height) / 2))
+
+def open_dialog_box(surface):
+    global offset_x
+    global offset_y
+    global big_box
+    global dialog_finish
+    global render_start
+    
+    if big_box.width < surface.width - padding and big_box.height < surface.height / 2 - padding:
+        big_box = pygame.transform.scale(big_box, (big_box.width + 10, big_box.height + 10))
+        offset_x = surface.width / 2 - big_box.width / 2
+        offset_y = (surface.height / 2) / 2 - big_box.height / 2
+    else:
+        render_start = True
+
+def close_dialog_box(surface):
+    global offset_x
+    global offset_y
+    global big_box
+    global dialog_finish
+    global show_dialog
+
+    if big_box.width > surface.width - 190 and big_box.height > surface.height - 390:
+        big_box = pygame.transform.scale(big_box, (big_box.width - 10, big_box.height - 10))
+        offset_x = surface.width / 2 - big_box.width / 2
+        offset_y = (surface.height / 2) / 2 - big_box.height / 2
+    else:
+        big_box.fill('white')
+        dialog_finish = False
+        show_dialog = False
+
+def color_swap(color):
+    background.blit(scrolling_surface(SQUARE_SIZE, SQUARE_SIZE))
+    color_filter.fill(color)
+    background.blit(color_filter)
+
+def create_color_filter(surface, opacity):
+    color_filter_surface = pygame.Surface((surface.width, surface.height))
+    color_filter_surface.set_alpha(opacity)
+    return color_filter_surface
+
+def scrolling_surface(square_width, square_height):
+    column_amount = math.ceil(WIN.width / square_width) + 2
+    row_amount = math.ceil(WIN.height / square_height) + 2
+    full_surface = pygame.Surface((column_amount * square_width, row_amount * square_height))
+    last_coords = [0, 0]
+    color_switcher = True
+
+    for row in range(1, row_amount):
+        last_coords[0] = 0
+        if row % 2 == 0:
+            color_switcher = False
+        else:
+            color_switcher = True
+
+        for column in range(1, column_amount):
+            square = pygame.Surface((square_width, square_height))
+            if color_switcher:
+                square.fill("#808080")
+            else:
+                square.fill("#c0c0c0")
+
+            full_surface.blit(square, last_coords)
+            last_coords[0] += square_width
+            color_switcher = not color_switcher
+            
+        last_coords[1] += square_height
+
+    return full_surface
+
+def scrolling_animation(speed, square_size):
+    background_coords[1] -= speed
+    background_coords[0] -= speed
+
+    if background_coords[0] == -square_size:
+        background_coords[0] = 0
+    if background_coords[1] == -square_size:
+        background_coords[1] = 0
+    
+
+background = scrolling_surface(SQUARE_SIZE, SQUARE_SIZE)
+color_filter = create_color_filter(background, 100)
+background_coords = [0, 0]
+
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            exit()
+        if event.type == pygame.KEYDOWN:
+            if not dialog_start:
+                show_dialog = True
+                dialog_start = True
+                slide_whistle_open.play()
+            elif not dialog_finish and not typing:
+                render_start = False
+                dialog_start = False
+                dialog_finish = True
+                shown_text = ''
+                slide_whistle_close.play()
+
+    color_swap(COLOR_LIST[1])
+    scrolling_animation(SPEED, SQUARE_SIZE)
+    WIN.blit(background, background_coords)
+    
+    if show_dialog:
+        WIN.blit(big_box, (0 + offset_x,(WIN.height / 2) + offset_y))
+
+    if dialog_start:
+        open_dialog_box(WIN)
+    
+    if frame % 3 == 0 and render_start:
+        render_text(message, 'black', big_box)
+
+    if dialog_finish:
+        close_dialog_box(WIN)
+
+    if frame > 100:
+        frame = 0
+        
+    pygame.display.update()
+    CLOCK.tick(60)
+    frame += 1
+    
